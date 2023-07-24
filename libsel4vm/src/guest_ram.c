@@ -356,11 +356,13 @@ int vm_ram_register_at(vm_t *vm, uintptr_t start, size_t bytes, bool untyped)
         ZF_LOGE("Unable to reserve ram region at addr 0x%"PRIxPTR" of size 0x%zx", start, bytes);
         return -1;
     }
+#ifndef CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP
     err = map_ram_reservation(vm, ram_reservation, untyped);
     if (err) {
         vm_free_reserved_memory(vm, ram_reservation);
         return -1;
     }
+#endif
     err = expand_guest_ram_region(vm, start, bytes);
     if (err) {
         ZF_LOGE("Failed to register new ram region");
