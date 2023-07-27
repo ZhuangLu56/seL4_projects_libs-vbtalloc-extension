@@ -5,6 +5,9 @@
  */
 #pragma once
 
+#include <autoconf.h>
+#include <sel4vm/gen_config.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <vka/cspacepath_t.h>
@@ -204,6 +207,26 @@ enum fault_width fault_get_width(fault_t *f);
  * @return           The access width size of the fault
  */
 size_t fault_get_width_size(fault_t *f);
+
+#ifdef CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP
+
+/**
+ * Get the access width of the page fault
+ * The fault must be a data fault.
+ * @param[in] fault  A handle to the fault
+ * @return           The access width of the fault
+ */
+enum fault_width fault_get_width_stage_2(fault_t *f);
+
+/**
+ * Get the access width size of the fault
+ * The fault must be a data fault.
+ * @param[in] fault  A handle to the fault
+ * @return           The access width size of the fault
+ */
+size_t fault_get_width_size_stage_2(fault_t *f);
+
+#endif
 
 /**
  * Get the context of a fault

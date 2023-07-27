@@ -227,8 +227,12 @@ static int decode_instruction(fault_t *f)
             }
         }
     } else {
-        printf("32 bit ARM insts not decoded\n");
-        print_fault(f);
+        /**
+         * FIXME:
+         *  We have to note them up for debug purpose.
+         */ 
+        //!printf("32 bit ARM insts not decoded\n");
+        //!print_fault(f);
         return -1;
     }
 }
@@ -597,7 +601,7 @@ enum fault_width fault_get_width(fault_t *f)
         if (HSR_IS_SYNDROME_VALID(f->fsr)) {
             switch (HSR_SYNDROME_WIDTH(f->fsr)) {
             case 0:
-                        f->width = WIDTH_BYTE;
+                f->width = WIDTH_BYTE;
                 break;
             case 1:
                 f->width = WIDTH_HALFWORD;
@@ -615,9 +619,7 @@ enum fault_width fault_get_width(fault_t *f)
             }
             f->content |= CONTENT_WIDTH;
         } else {
-            int rt;
-            rt = decode_instruction(f);
-            assert(rt >= 0);
+            assert(decode_instruction(f) >= 0);
         }
     }
     return f->width;
@@ -639,3 +641,65 @@ size_t fault_get_width_size(fault_t *fault)
         return 0;
     }
 }
+
+#ifdef CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP
+/**
+ * XXX: wrapper function for fault_get_width_stage_2
+ */
+size_t fault_get_width_size_stage_2(fault_t *fault)
+{
+    enum fault_width width = fault_get_width_stage_2(fault);
+    switch (width) {
+    case WIDTH_DOUBLEWORD:
+        return sizeof(long long);
+    case WIDTH_WORD:
+        return sizeof(int);
+    case WIDTH_HALFWORD:
+        return sizeof(short);
+    case WIDTH_BYTE:
+        return sizeof(char);
+    default:
+        return 0;
+    }
+}
+/***
+ * TODO:
+ *   This will only be used when a memory fault (VM fault at stage-2 will triggered)
+ *   So we should replace it when we are more familiar with the software architecture.
+ */
+enum fault_width fault_get_width_stage_2(fault_t *f)
+{
+    if ((f->content & CONTENT_WIDTH) == 0) {
+        if (HSR_IS_SYNDROME_VALID(f->fsr)) {
+            switch (HSR_SYNDROME_WIDTH(f->fsr)) {
+            case 0:
+                f->width = WIDTH_BYTE;
+                break;
+            case 1:
+                f->width = WIDTH_HALFWORD;
+                break;
+            case 2:
+                f->width = WIDTH_WORD;
+                break;
+            case 3:
+                f->width = WIDTH_DOUBLEWORD;
+                break;
+            default:
+                print_fault(f);
+                assert(0);
+                return 0;
+            }
+            f->content |= CONTENT_WIDTH;
+        } else {
+            /***
+             * FIXME:
+             *   Now we don't have other ISA decoder other than 'Thumb'
+             * So we treat it as WORD_WIDTH instruction to trigger page
+             * fault handling procedure.
+             */               
+            f->width = WIDTH_BYTE;
+        }
+    }
+    return f->width;
+}
+#endif
