@@ -20,6 +20,7 @@
 #include <sel4vm/guest_ram.h>
 
 #include <sel4vmmplatsupport/guest_image.h>
+#include <sel4vmmplatsupport/guest_memory_util.h>
 
 #define UIMAGE_MAGIC 0x56190527
 #define ZIMAGE_MAGIC 0x016F2818
@@ -170,6 +171,19 @@ static int load_image(vm_t *vm, const char *image_name, uintptr_t load_addr,  si
     }
 
     vm_ram_mark_allocated(vm, load_addr, ROUND_UP(file_size, PAGE_SIZE_4K));
+    /**
+     * Now try to map deferred frames for the image.
+     * Since the images are going to be loaded into
+     * virtual RAM regions, we should utilize their
+     * RAM reservation information.
+    */
+    if (config_set(CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP)) {
+        error = maybe_map_deferred_pages_at(vm, load_addr, file_size, NULL, NULL);
+        if (error) {
+            ZF_LOGE("Error: Failed to map deferred frames for image \'%s\'", image_name);
+            return -1;
+        }
+    }
     error = vm_ram_touch(vm, load_addr, file_size, guest_write_address, (void *)&fd);
     if (error) {
         ZF_LOGE("Error: Failed to load \'%s\'", image_name);
