@@ -74,3 +74,17 @@ int map_frame_alloc_reservation(vm_t *vm, vm_memory_reservation_t *reservation);
  * @return                                              -1 on failure otherwise 0 for success
  */
 int map_maybe_device_reservation(vm_t *vm, vm_memory_reservation_t *reservation);
+
+
+/***
+ * @function maybe_map_deferred_pages_at(vm, addr, size)
+ * Try mapping deferred pages at addr for images to be loaded (with size)
+ * @param {vm_t *} vm                               A handle to the VM
+ * @param {uintptr_t} addr                          Address of frames to be mapped
+ * @param {size_t} size                             Number (in size_t) of frames to be mapped
+ * @param {memory_map_iterator_fn} map_iterator     Mapping iterator utility
+ * @param {void *} cookie                           Cookie to pass onto map_iterator function
+ * @return                                          -1 on failure otherwise 0 for success
+ */
+int maybe_map_deferred_pages_at(vm_t *vm, uintptr_t addr, size_t size,
+                                memory_map_iterator_fn map_iterator, void *cookie);

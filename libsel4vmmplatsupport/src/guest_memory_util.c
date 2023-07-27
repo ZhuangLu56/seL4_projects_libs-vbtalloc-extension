@@ -13,6 +13,7 @@
 #include <vka/capops.h>
 
 #include <sel4vm/guest_vm.h>
+#include <sel4vm/guest_ram.h>
 #include <sel4vm/guest_memory.h>
 #include <sel4vm/guest_memory_helpers.h>
 
@@ -334,4 +335,25 @@ int map_frame_alloc_reservation(vm_t *vm, vm_memory_reservation_t *reservation)
 int map_maybe_device_reservation(vm_t *vm, vm_memory_reservation_t *reservation)
 {
     return vm_map_reservation(vm, reservation, maybe_device_alloc_iterator, (void *)vm);
+}
+
+int maybe_map_deferred_pages_at(vm_t *vm, uintptr_t addr, size_t size,
+                                memory_map_iterator_fn map_iterator, void *cookie)
+{
+    /***
+     * FIXME:
+     *  Any case for we will use it with an map_iterator that is not NULL?
+     *  If the 'map_iterator' and 'cookie' are provided, use it then.
+     */
+    if (map_iterator && cookie) {
+        return vm_memory_try_mapping_deferred_pages(vm, addr, size,
+                                                    map_iterator, (void *)cookie);
+    }
+    /***
+     * FIXME:
+     *  'vm_ram_map_deferred_pages_at' is a wrapper function. It only knows that
+     *  calling the map_iterator provided by 'guest_ram.c' will be beneficial to
+     *  RAM deferred pages, which should have been loaded by 'init_ram_module'.
+     */
+    return vm_ram_map_deferred_pages_at(vm, addr, size);
 }
