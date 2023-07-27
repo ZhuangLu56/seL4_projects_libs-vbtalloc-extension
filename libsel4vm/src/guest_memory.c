@@ -534,7 +534,11 @@ int vm_map_reservation(vm_t *vm, vm_memory_reservation_t *reservation,
 
     reservation->memory_map_iterator = map_iterator;
     reservation->memory_iterator_cookie = cookie;
-    if (!config_set(CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP)) {
+    /***
+     * XXX: This needs a FIXUP to do deferred mappings for dataport frames.
+     */
+    /* if (!config_set(CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP)) { */
+    if (true) {
         err = map_vm_memory_reservation(vm, reservation, map_iterator, cookie);
         /* We remove the iterator after attempting the mapping (regardless of success or fail)
          * If failed its left to the caller to update the memory map iterator */
@@ -569,6 +573,27 @@ int vm_map_reservation_frames(vm_t *vm, vm_memory_reservation_t *reservation,
                               seL4_CPtr *frames, size_t num_frames,
                               size_t frame_size_bits)
 {
+    /***
+     * FIXME:
+     *   The temporary variable 'cookie' defined here will possibly be free'd
+     *   when the function call is finished. So when we need to defer their
+     *   mapping procedure (they = the 'frames'), a new convention is essential
+     */
+#ifdef CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP
+    struct frames_map_iterator_cookie *cookie = calloc(1, sizeof(*cookie));
+    assert(cookie);
+    /***
+     * FIXME:
+     *  It turn out that when the mapping procedure is deferred, in vm's
+     *  vspace, the 'reservation' is sentenced to invalid (not reserved?)
+     */
+    cookie->frames = frames;
+    cookie->num_frames = num_frames;
+    cookie->frame_size_bits = frame_size_bits;
+    cookie->start = reservation->addr;
+    return vm_map_reservation(vm, reservation, frames_map_memory_iterator,
+                              cookie);
+#else
     struct frames_map_iterator_cookie cookie = {
         .frames = frames,
         .num_frames = num_frames,
@@ -578,6 +603,7 @@ int vm_map_reservation_frames(vm_t *vm, vm_memory_reservation_t *reservation,
 
     return vm_map_reservation(vm, reservation, frames_map_memory_iterator,
                               &cookie);
+#endif
 }
 
 void vm_get_reservation_memory_region(vm_memory_reservation_t *reservation, uintptr_t *addr, size_t *size)

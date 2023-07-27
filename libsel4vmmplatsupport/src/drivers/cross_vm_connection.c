@@ -158,13 +158,22 @@ static int reserve_dataport_memory(vm_t *vm, crossvm_dataport_handle_t *dataport
                 dataport_address);
         return -1;
     }
-
-    int err = vm_map_reservation_frames(vm, dataport_reservation, frames,
-                                        dataport->num_frames,
-                                        dataport->frame_size_bits);
-    if (err) {
-        ZF_LOGE("Failed to map dataport memory");
-        return -1;
+    /***
+     * FIXME:
+     *   For all dataport frames, it's feasible to map them promptly
+     *   and it turns out that deferred mapping is now not available.
+     */
+    /* if (!config_set(CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP)) { */
+    if (true) {
+        int err = vm_map_reservation_frames(vm, dataport_reservation, frames,
+                                            dataport->num_frames,
+                                            dataport->frame_size_bits);
+        if (err) {
+            ZF_LOGE("Failed to map dataport memory");
+            return -1;
+        }        
+    //!} else {
+    //!    ;
     }
     info->dataport_address = dataport_address;
     info->dataport_size_bits = BYTES_TO_SIZE_BITS(size);
