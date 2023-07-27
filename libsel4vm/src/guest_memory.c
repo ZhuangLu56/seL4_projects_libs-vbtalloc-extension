@@ -573,3 +573,54 @@ int vm_memory_init(vm_t *vm)
     vm->mem.reservation_cookie = cookie;
     return 0;
 }
+
+int vm_memory_try_mapping_deferred_pages(vm_t *vm, uintptr_t addr, size_t size,
+                                         memory_map_iterator_fn map_iterator, void *map_cookie)
+{
+    int err;
+    res_tree *reservation_node = find_memory_reservation_by_addr(vm, addr);
+    vm_memory_reservation_t *ram_reservation;
+    
+    if (!reservation_node) {
+        assert(0); /* assert as fault detecting unit by now */
+    }
+
+    if ((reservation_node->addr + size) > (reservation_node->addr + reservation_node->size)) {
+        assert(0);
+    }
+
+    if (reservation_node->res_type == MEM_REGULAR_RES) {
+        ram_reservation = (vm_memory_reservation_t *)reservation_node->data;
+    } else {
+        ram_reservation = find_anon_reservation_by_addr(addr, size,
+                                                          (anon_region_t *)reservation_node->data);
+        if (!ram_reservation) {
+            assert(0);
+        }
+    }
+    /* We only need to map one page each time. */
+    uintptr_t curr = 0;
+
+    while (curr < size) {
+        vm_frame_t reservation_frame = map_iterator(curr + addr, map_cookie);
+        if (reservation_frame.cptr == seL4_CapNull) {
+            ZF_LOGE("Failed to get frame for reservation address 0x%lx", curr + addr);
+            return -1;
+        }
+        int ret = vspace_deferred_rights_map_pages_at_vaddr(&vm->mem.vm_vspace, &reservation_frame.cptr, NULL,
+                                                            (void *)reservation_frame.vaddr, 1, reservation_frame.size_bits,
+                                                            reservation_frame.rights, ram_reservation->vspace_reservation);
+        if (ret) {
+            ZF_LOGE("Failed to map address 0x%"PRIxPTR" into guest vm vspace", reservation_frame.vaddr);
+            return -1;
+        }
+        curr += BIT(reservation_frame.size_bits);
+    }
+    if (!ram_reservation->memory_map_iterator) {
+        ram_reservation->memory_map_iterator = map_iterator;
+    }
+    if (!ram_reservation->memory_iterator_cookie) {
+        ram_reservation->memory_iterator_cookie = (void *)map_cookie;
+    }
+    return 0;
+}

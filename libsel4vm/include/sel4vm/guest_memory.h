@@ -167,3 +167,16 @@ void vm_get_reservation_memory_region(vm_memory_reservation_t *reservation, uint
  * @return                          -1 on failure otherwise 0 for success
 */
 int vm_memory_init(vm_t *vm);
+
+/***
+ * @function vm_memory_try_mapping_deferred_pages(vm, addr, size, map_iterator, map_cookie)
+ * Try mapping deferred pages for images to be loaded.
+ * @param {vm_t *} vm                               A handle to the VM
+ * @param {uintptr} addr                            Base address of the memory region being made into an images
+ * @param {size_t} size                             Size of the memory region that is going to be mapped
+ * @param {memory_map_iterator_fn} map_iterator     Mapping iterator utility
+ * @param {void *} map_cookie                       Cookie to pass onto map_iterator function
+ * @return                                          -1 on failure otherwise 0 for success
+ */
+int vm_memory_try_mapping_deferred_pages(vm_t *vm, uintptr_t addr, size_t size,
+                                         memory_map_iterator_fn map_iterator, void *map_cookie);
