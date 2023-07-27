@@ -6,9 +6,6 @@
 
 #pragma once
 
-#include <autoconf.h>
-#include <sel4vm/gen_config.h>
-
 #include <sel4vm/guest_vm.h>
 
 /***
@@ -137,3 +134,12 @@ uintptr_t vm_ram_allocate(vm_t *vm, size_t bytes);
  * @param {size_t} size         The size of the RAM region to be free'd
  */
 void vm_ram_free(vm_t *vm, uintptr_t start, size_t bytes);
+
+/***
+ * @function vm_ram_map_deferred_pages_at(vm, start, bytes)
+ * Map a memory region for RAM (mappings of these pages of the memory region are deferred)
+ * @param {vm_t *} vm           A handle to the VM that ram needs to be mapped for
+ * @param {uintptr_t} start     Starting guest physical address of the ram region being mapped
+ * @param {size_t} bytes        The size of the RAM region to be mapped
+ */
+int vm_ram_map_deferred_pages_at(vm_t *vm, uintptr_t start, size_t bytes);
