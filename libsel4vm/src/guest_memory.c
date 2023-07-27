@@ -297,7 +297,32 @@ memory_fault_result_t vm_memory_handle_fault(vm_t *vm, vm_vcpu_t *vcpu, uintptr_
             return FAULT_UNHANDLED;
         }
     }
-
+#ifdef CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP
+    if (!fault_reservation->is_mapped && fault_reservation->memory_map_iterator)
+    {
+        uintptr_t current_addr = addr;
+        while (current_addr < addr + size) {
+            vm_frame_t reservation_frame = fault_reservation->memory_map_iterator(current_addr,
+                                                                                  fault_reservation->memory_iterator_cookie);
+            if (reservation_frame.cptr == seL4_CapNull) {
+                ZF_LOGE("Failed to get frame for reservation address 0x%lx", current_addr);
+                fault_reservation->memory_map_iterator = NULL;
+                fault_reservation->memory_iterator_cookie = NULL;
+                fault_reservation->is_mapped = true;
+                break;
+            }
+            int ret = vspace_deferred_rights_map_pages_at_vaddr(&vm->mem.vm_vspace, &reservation_frame.cptr, NULL,
+                                                                (void *)reservation_frame.vaddr, 1, reservation_frame.size_bits,
+                                                                reservation_frame.rights, fault_reservation->vspace_reservation);
+            if (ret) {
+                ZF_LOGE("Failed to map address 0x%"PRIxPTR" into guest vm vspace", reservation_frame.vaddr);
+                return FAULT_ERROR;
+            }
+            current_addr += BIT(reservation_frame.size_bits);
+        }
+        return FAULT_RESTART;
+    }
+#else
     if (!fault_reservation->is_mapped && fault_reservation->memory_map_iterator) {
         /* Deferred mapping */
         err = map_vm_memory_reservation(vm, fault_reservation,
@@ -308,7 +333,7 @@ memory_fault_result_t vm_memory_handle_fault(vm_t *vm, vm_vcpu_t *vcpu, uintptr_
         }
         return FAULT_RESTART;
     }
-
+#endif
     if (!fault_reservation->fault_callback) {
         return FAULT_ERROR;
     }
