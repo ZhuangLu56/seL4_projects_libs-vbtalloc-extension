@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <autoconf.h>
+#include <sel4vm/gen_config.h>
 #include <sel4/sel4.h>
 
 #include <vka/vka.h>
