@@ -18,6 +18,8 @@
 #include <sel4vm/arch/guest_vm_arch.h>
 #include <sel4vm/guest_memory.h>
 
+#include <sel4/benchmark_utilisation_types.h>
+
 typedef struct vm vm_t;
 typedef struct vm_vcpu vm_vcpu_t;
 typedef struct vm_mem vm_mem_t;
@@ -214,6 +216,11 @@ struct vm {
     char *vm_name;
     unsigned int vm_id;
     bool vm_initialised;
+#ifdef CONFIG_KERNEL_BENCHMARK
+    unsigned long long page_fault_num;
+    unsigned long long page_fault_tcb_utilisation;
+    unsigned long long page_fault_kernel_utilisation;
+#endif
 };
 
 /***

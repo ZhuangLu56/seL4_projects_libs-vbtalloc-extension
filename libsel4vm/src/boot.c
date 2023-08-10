@@ -16,6 +16,8 @@
 #include <sel4vm/guest_vm_exits.h>
 #include <sel4vm/guest_vm_util.h>
 
+#include <sel4/benchmark_utilisation_types.h>
+
 #include "vm_boot.h"
 
 static int curr_vcpu_index = 0;
@@ -36,6 +38,11 @@ int vm_init(vm_t *vm, vka_t *vka, simple_t *host_simple, vspace_t host_vspace,
     /* Initialise ram region */
     vm->mem.num_ram_regions = 0;
     vm->mem.ram_regions = malloc(0);
+#ifdef CONFIG_KERNEL_BENCHMARK
+    vm->page_fault_num = 0;
+    vm->page_fault_tcb_utilisation = 0;
+    vm->page_fault_kernel_utilisation = 0;
+#endif
     assert(vm->vcpus);
     /* Initialise vm memory management interface */
     err = vm_memory_init(vm);

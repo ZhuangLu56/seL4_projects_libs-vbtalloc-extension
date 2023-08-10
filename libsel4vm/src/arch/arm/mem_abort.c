@@ -17,6 +17,8 @@
 #include "fault.h"
 #include "guest_memory.h"
 
+#include <sel4/benchmark_utilisation_types.h>
+
 static int unhandled_memory_fault(vm_t *vm, vm_vcpu_t *vcpu, fault_t *fault)
 {
     uintptr_t addr = fault_get_address(fault);
@@ -102,9 +104,26 @@ int vm_guest_mem_abort_handler(vm_vcpu_t *vcpu)
         ZF_LOGE("Failed to initialise new fault");
         return -1;
     }
+#ifdef CONFIG_KERNEL_BENCHMARK
+    uint64_t *ipcbuffer = (uint64_t *)&(seL4_GetIPCBuffer()->msg[0]);
+    seL4_BenchmarkResetThreadUtilisation(simple_get_tcb(vcpu->vm->simple));
+    seL4_BenchmarkResetLog();
+#endif
     err = handle_page_fault(vcpu->vm, vcpu, fault);
+#ifdef CONFIG_KERNEL_BENCHMARK
+    seL4_BenchmarkFinalizeLog();
+    seL4_BenchmarkGetThreadUtilisation(simple_get_tcb(vcpu->vm->simple));
+#endif
     if (err) {
         return VM_EXIT_HANDLE_ERROR;
     }
+#ifdef CONFIG_KERNEL_BENCHMARK
+    vcpu->vm->page_fault_num += 1;
+    vcpu->vm->page_fault_tcb_utilisation += ipcbuffer[BENCHMARK_TCB_UTILISATION];
+    vcpu->vm->page_fault_kernel_utilisation += ipcbuffer[BENCHMARK_TCB_KERNEL_UTILISATION];
+    printf("kernel: %llu, user: %llu\n",
+            vcpu->vm->page_fault_tcb_utilisation / vcpu->vm->page_fault_num,
+            vcpu->vm->page_fault_kernel_utilisation / vcpu->vm->page_fault_num);
+#endif
     return VM_EXIT_HANDLED;
 }
