@@ -19,16 +19,18 @@
 
 #include <sel4/benchmark_utilisation_types.h>
 
+#define CONN2(a, b) a##b
+#define CONN3(a, b, c) a##b##c
+#ifdef CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP
+#define FAULT_GET_WIDTH CONN3(fault, _get_width_size, _stage_2)
+#else
+#define FAULT_GET_WIDTH CONN2(fault, _get_width_size)
+#endif
+
 static int unhandled_memory_fault(vm_t *vm, vm_vcpu_t *vcpu, fault_t *fault)
 {
     uintptr_t addr = fault_get_address(fault);
-
-    size_t fault_size;
-    if (config_set(CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP)) {
-        fault_size = fault_get_width_size_stage_2(fault);
-    } else {
-        fault_size = fault_get_width_size(fault);
-    }
+    size_t fault_size = FAULT_GET_WIDTH(fault);
     
     memory_fault_result_t fault_result = vm->mem.unhandled_mem_fault_handler(vm, vcpu, addr, fault_size,
                                                                              vm->mem.unhandled_mem_fault_cookie);
@@ -52,15 +54,8 @@ static int unhandled_memory_fault(vm_t *vm, vm_vcpu_t *vcpu, fault_t *fault)
 
 int handle_page_fault(vm_t *vm, vm_vcpu_t *vcpu, fault_t *fault)
 {
-    int err;
     uintptr_t addr = fault_get_address(fault);
-
-    size_t fault_size;
-    if (config_set(CONFIG_LIB_SEL4VM_DEFER_MEMORY_MAP)) {
-        fault_size = fault_get_width_size_stage_2(fault);
-    } else {
-        fault_size = fault_get_width_size(fault);
-    }
+    size_t fault_size = FAULT_GET_WIDTH(fault);
 
     memory_fault_result_t fault_result = vm_memory_handle_fault(vm, vcpu, addr, fault_size);
     switch (fault_result) {
@@ -76,6 +71,7 @@ int handle_page_fault(vm_t *vm, vm_vcpu_t *vcpu, fault_t *fault)
         abandon_fault(fault);
         return -1;
     case FAULT_UNHANDLED:
+        int err;
         if (vm->mem.unhandled_mem_fault_handler) {
             err = unhandled_memory_fault(vm, vcpu, fault);
             if (err) {
