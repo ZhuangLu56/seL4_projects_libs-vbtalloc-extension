@@ -11,13 +11,13 @@
 #include <sel4vm/guest_vm.h>
 #include <sel4vm/boot.h>
 #include "sel4vm/guest_memory.h"
-
 #include "vm.h"
 #include "mem_abort.h"
 #include "fault.h"
 #include "guest_memory.h"
-
 #include <sel4/benchmark_utilisation_types.h>
+#include <sel4vm/guest_vm_util.h>
+#include <sel4vm/guest_vcpu_fault.h>
 
 #define CONN2(a, b) a##b
 #define CONN3(a, b, c) a##b##c
@@ -56,6 +56,7 @@ int handle_page_fault(vm_t *vm, vm_vcpu_t *vcpu, fault_t *fault)
 {
     uintptr_t addr = fault_get_address(fault);
     size_t fault_size = FAULT_GET_WIDTH(fault);
+    int err;
 
     memory_fault_result_t fault_result = vm_memory_handle_fault(vm, vcpu, addr, fault_size);
     switch (fault_result) {
@@ -71,7 +72,6 @@ int handle_page_fault(vm_t *vm, vm_vcpu_t *vcpu, fault_t *fault)
         abandon_fault(fault);
         return -1;
     case FAULT_UNHANDLED:
-        int err;
         if (vm->mem.unhandled_mem_fault_handler) {
             err = unhandled_memory_fault(vm, vcpu, fault);
             if (err) {
@@ -90,6 +90,23 @@ int handle_page_fault(vm_t *vm, vm_vcpu_t *vcpu, fault_t *fault)
     return -1;
 }
 
+int handle_hvc_fault(vm_t *vm, fault_t *fault, vm_vcpu_t *vcpu)
+{   
+    vspace_t *vspace;
+    int err;
+    seL4_UserContext regs;
+    seL4_CPtr tcb;
+    uintptr_t addr = fault_get_address(fault);
+
+    tcb = vm_get_vcpu_tcb(vcpu);
+    err = seL4_TCB_ReadRegisters(tcb, false, 0, sizeof(regs) / sizeof(regs.pc), &regs);
+    assert(!err);
+    vspace = vm_get_vspace(vm);
+    vspace->unmap_pages(vspace, (void *)regs.r0, 1, PAGE_BITS_4K, vm->vka);
+    advance_vcpu_fault(vcpu);
+    return 0;
+}
+
 int vm_guest_mem_abort_handler(vm_vcpu_t *vcpu)
 {
     int err;
@@ -105,7 +122,14 @@ int vm_guest_mem_abort_handler(vm_vcpu_t *vcpu)
     seL4_BenchmarkResetThreadUtilisation(simple_get_tcb(vcpu->vm->simple));
     seL4_BenchmarkResetLog();
 #endif
-    err = handle_page_fault(vcpu->vm, vcpu, fault);
+
+    if (fault->type < 2) {
+        err = handle_page_fault(vcpu->vm, vcpu, fault);
+    } 
+    else {
+        err = handle_hvc_fault(vcpu->vm, fault, vcpu);
+    }
+    
 #ifdef CONFIG_KERNEL_BENCHMARK
     seL4_BenchmarkFinalizeLog();
     seL4_BenchmarkGetThreadUtilisation(simple_get_tcb(vcpu->vm->simple));
@@ -117,7 +141,7 @@ int vm_guest_mem_abort_handler(vm_vcpu_t *vcpu)
     vcpu->vm->page_fault_num += 1;
     vcpu->vm->page_fault_tcb_utilisation += ipcbuffer[BENCHMARK_TCB_UTILISATION];
     vcpu->vm->page_fault_kernel_utilisation += ipcbuffer[BENCHMARK_TCB_KERNEL_UTILISATION];
-    printf("kernel: %llu, user: %llu\n",
+    printf("user: %llu, kernel: %llu\n",
             vcpu->vm->page_fault_tcb_utilisation / vcpu->vm->page_fault_num,
             vcpu->vm->page_fault_kernel_utilisation / vcpu->vm->page_fault_num);
 #endif

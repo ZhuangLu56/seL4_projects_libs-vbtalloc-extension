@@ -27,7 +27,8 @@ enum fault_width {
 typedef enum {
     DATA,
     PREFETCH,
-    VCPU
+    VCPU,
+    HVC,
 } fault_type_t;
 
 #define CPSR_THUMB                 BIT(5)

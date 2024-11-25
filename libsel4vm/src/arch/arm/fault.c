@@ -321,7 +321,12 @@ int new_memory_fault(fault_t *fault)
     ip = seL4_GetMR(seL4_VMFault_IP);
     DFAULT("%s: New fault @ 0x%x from PC 0x%x\n", vm->vm_name, addr, ip);
     /* Create the fault object */
-    fault->type = is_prefetch ? PREFETCH : DATA;
+    if (fsr == 0x2000000) {
+        fault->type = HVC;
+    } else {
+        fault->type = is_prefetch ? PREFETCH : DATA;
+    }
+
     fault->ip = ip;
     fault->base_addr = fault->addr = addr;
     fault->fsr = fsr;
@@ -344,6 +349,10 @@ int new_memory_fault(fault_t *fault)
     } else {
         /* No need to load width or data */
         fault->content = CONTENT_DATA | CONTENT_WIDTH;
+    }
+
+    if (fault->type == HVC) {
+        fault->stage = 1;
     }
 
     /* Gather additional information */
